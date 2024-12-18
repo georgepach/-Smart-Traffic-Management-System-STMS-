@@ -1,95 +1,82 @@
 import cv2
+import numpy as np
 import torch
-import os
 
-def detect_objects(video_path, custom_classes):
-    # Load YOLOv5 model (pretrained on COCO dataset)
-    model = torch.hub.load('ultralytics/yolov5', 'yolov5m', pretrained=True)  # Larger model variant for better accuracy
+# Load YOLOv5 model (ensure YOLOv5 weights are in the directory)
+model = torch.hub.load('ultralytics/yolov5', 'yolov5s')  # Use 'yolov5s' or your custom model
 
-    # Check if the video file exists
-    if not os.path.exists(video_path):
-        print("Error: Video file does not exist! Double-check the path.")
-        return
+# Define Regions of Interest (ROI)
+def define_rois(frame):
+    h, w, _ = frame.shape
+    rois = {
+        "Left": [(0, h//2), (w//2, h)],  # Left lane region
+        "Up": [(w//2, 0), (w, h//2)],    # Upward lane region
+        "Right": [(w//2, h//2), (w, h)],  # Right lane region
+        "Down": [(0, 0), (w//2, h//2)]   # Downward lane region
+    }
+    return rois
 
-    # Open the video
+# Draw ROIs on the frame
+def draw_rois(frame, rois):
+    for key, points in rois.items():
+        cv2.rectangle(frame, points[0], points[1], (0, 255, 0), 2)
+        cv2.putText(frame, key, (points[0][0] + 10, points[0][1] + 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    return frame
+
+# Detect vehicles and count them in each ROI
+def detect_and_count(frame, rois):
+    results = model(frame)  # Run YOLOv5 detection
+    vehicles = ['car', 'truck', 'bus', 'motorbike']
+    counts = {key: 0 for key in rois}  # Initialize vehicle counts per ROI
+
+    # Extract detection results
+    for *box, conf, cls in results.xyxy[0]:
+        if model.names[int(cls)] in vehicles:  # Only count vehicles
+            x1, y1, x2, y2 = map(int, box)
+            center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
+            
+            # Check which ROI the vehicle falls into
+            for key, points in rois.items():
+                if points[0][0] <= center_x <= points[1][0] and points[0][1] <= center_y <= points[1][1]:
+                    counts[key] += 1
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    cv2.putText(frame, model.names[int(cls)], (x1, y1 - 5), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    return frame, counts
+
+# Determine priority lane
+def determine_priority(counts):
+    priority = max(counts, key=counts.get)  # Lane with the highest vehicle count
+    return priority
+
+# Main function
+def main(video_path):
     cap = cv2.VideoCapture(video_path)
-    
-    # Check if the video was opened successfully
-    if not cap.isOpened():
-        print("Error: Could not open video.")
-        return
-    
-    print("Video opened successfully!")
-    
-    while True:
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            break  # End of the video
-
-        # Resize the frame for consistent processing
-        frame_resized = cv2.resize(frame, (1280, 720))
-        h, w, _ = frame_resized.shape
-
-        # Perform YOLOv5 detection
-        with torch.no_grad():  # Disable gradients for better performance
-            results = model(frame_resized)
+            break
         
-        detections = results.pandas().xyxy[0]  # Get detection results as a pandas DataFrame
-
-        # Draw detected objects and lane overlays
-        def draw_lanes_and_priority(img, detections):
-            lane_color = (0, 255, 0)  # Green lanes for active lanes
-            inactive_lane_color = (0, 0, 255)  # Red lanes for inactive lanes
-            thickness = 2
-            
-            # Draw horizontal and vertical center lanes
-            cv2.line(img, (0, h // 2), (w, h // 2), lane_color, thickness)
-            cv2.line(img, (w // 2, 0), (w // 2, h), lane_color, thickness)
-
-            # Vehicle counts in each lane
-            lane_counts = {'Up-Left': 0, 'Up-Right': 0, 'Down-Left': 0, 'Down-Right': 0}
-            
-            for _, row in detections.iterrows():
-                class_id = int(row['class'])
-                if class_id in custom_classes:
-                    x1, y1, x2, y2 = int(row['xmin']), int(row['ymin']), int(row['xmax']), int(row['ymax'])
-                    center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-                    
-                    # Assign detected vehicles to a lane
-                    if center_x < w // 2 and center_y < h // 2:
-                        lane_counts['Up-Left'] += 1
-                    elif center_x > w // 2 and center_y < h // 2:
-                        lane_counts['Up-Right'] += 1
-                    elif center_x < w // 2 and center_y > h // 2:
-                        lane_counts['Down-Left'] += 1
-                    else:
-                        lane_counts['Down-Right'] += 1
-                    
-                    # Draw bounding box and label
-                    cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(img, f"Class {class_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-            # Determine the priority lane
-            max_lane = max(lane_counts, key=lane_counts.get)
-            cv2.putText(img, f"Priority Lane: {max_lane} (Green)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-        # Draw lanes and priority
-        draw_lanes_and_priority(frame_resized, detections)
-
-        # Display the result
-        cv2.imshow("Real-Time Lane Prioritization", frame_resized)
+        # Define ROIs and process the frame
+        rois = define_rois(frame)
+        frame = draw_rois(frame, rois)
+        frame, counts = detect_and_count(frame, rois)
         
-        # Press 'q' to quit
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        # Determine and display the priority lane
+        priority_lane = determine_priority(counts)
+        cv2.putText(frame, f"Priority Lane: {priority_lane} (Green)", (50, 50), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+
+        # Display the processed frame
+        cv2.imshow('Traffic Priority Detection', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to quit
             break
 
-    # Release the video capture object
     cap.release()
     cv2.destroyAllWindows()
 
+# Run the main function with your video file
 if __name__ == "__main__":
-    # Path to the video file
-    video_path = 'C:\\AITEST1\\video\\carvideo.mp4'  # Replace with the path to your video
-    CUSTOM_CLASSES = [2, 3, 5, 7]  # Vehicle classes: car, motorcycle, bus, truck
-
-    detect_objects(video_path, CUSTOM_CLASSES)
+    video_path = "C:\\AITEST1\\video\\carvideo.mp4"  # Replace with your video file
+    main(video_path)
