@@ -8,15 +8,15 @@ model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
 # Define Regions of Interest (ROI) based on the image (1920x1080 resolution)
 def define_rois(frame):
     # Define ROIs as per the given coordinates
-    Forward_Left = np.array([[0, 470], [200, 470], [300, 300], [0, 300]])
-    Forward_Up = np.array([[300, 300], [600, 300], [600, 150], [300, 150]])
-    Forward_Right = np.array([[700, 470], [900, 470], [900, 400], [700, 400]])
+    Forward_Left = np.array([[0, 900], [850, 850], [650, 650], [0, 650]])
+    Forward_Up = np.array([[1460, 580], [1580, 690], [1920, 660], [1920, 550]])
+    Forward_Right = np.array([[650, 570], [1000, 570], [800, 400], [600, 400]])
 
     # Store the regions in a dictionary
     rois = {
-        "Forward_Left": Forward_Left,
-        "Forward_Up": Forward_Up,
-        "Forward_Right": Forward_Right
+        "LANE 1": Forward_Left,
+        "LANE 2": Forward_Up,
+        "LANE 3": Forward_Right
     }
     return rois
 
