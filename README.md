@@ -63,7 +63,7 @@ The combination of these technologies enables the system to respond dynamically 
    - Traffic patterns are analyzed for long-term urban planning improvements.
 
 ## 🖼️ 
-https://github.com/georgepach/-Smart-Traffic-Management-System-STMS-/blob/9f524f597789e831c86b62f320439d3d6028c6b5/Screenshot%202024-12-23%20202814.png
+![image alt](https://github.com/georgepach/-Smart-Traffic-Management-System-STMS-/blob/9f524f597789e831c86b62f320439d3d6028c6b5/Screenshot%202024-12-23%20202814.png)
 
 
 ## 📄 Project Deliverables
