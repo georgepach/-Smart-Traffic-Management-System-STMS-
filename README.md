@@ -10,8 +10,6 @@ The **Smart Traffic Management System (STMS)** integrates cutting-edge technolog
 - **YOLO (You Only Look Once)** for real-time vehicle detection and classification.
 - **Reinforcement Learning (RL)** for optimizing traffic light durations.
 - **Internet of Things (IoT) and smart sensors** (Inductive Loops, radar, and traffic cameras) for real-time data collection.
-- **Kalman Filters** for vehicle movement prediction and smoother traffic transitions.
-- **Vehicle-to-Infrastructure (V2I) communication** for improved traffic coordination.
 
 The combination of these technologies enables the system to respond dynamically to unforeseen conditions such as accidents or bad weather, reducing congestion and improving road safety.
 
